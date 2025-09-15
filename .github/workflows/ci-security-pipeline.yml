@@ -55,21 +55,18 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true
 
-      # Initialize CodeQL only for pushes to dev and scheduled runs
+      # Initialize CodeQL for all events to prevent "waiting for status" issues
       - name: Initialize CodeQL
-        if: github.event_name == 'push' || github.event_name == 'schedule'
         uses: github/codeql-action/init@v3
         with:
           languages: javascript
-          # Use custom queries from the community
-          queries: security-extended,security-and-quality
+          # Use basic queries on PRs, extended on pushes/schedule
+          queries: ${{ github.event_name == 'pull_request' && 'security-only' || 'security-extended,security-and-quality' }}
 
-      # Autobuild for CodeQL (only when CodeQL is initialized)
+      # Autobuild for CodeQL
       - name: Autobuild
-        if: github.event_name == 'push' || github.event_name == 'schedule'
         uses: github/codeql-action/autobuild@v3
 
-      # Perform CodeQL Analysis (only when CodeQL is initialized)
+      # Perform CodeQL Analysis
       - name: Perform CodeQL Analysis
-        if: github.event_name == 'push' || github.event_name == 'schedule'
         uses: github/codeql-action/analyze@v3

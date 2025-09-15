@@ -8,7 +8,7 @@ import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Enable global validation pipe (class-validator & class-transformer)
   app.useGlobalPipes(
     new ValidationPipe({
@@ -34,4 +34,8 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 3000);
 }
-bootstrap();
+
+bootstrap().catch((error: unknown) => {
+  console.error('Error starting the application:', error);
+  process.exit(1);
+});

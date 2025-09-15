@@ -30,5 +30,7 @@ export declare class AuthController {
             role: string;
         };
     }>;
-    getProfile(req: any): Promise<any>;
+    getProfile(req: {
+        user: any;
+    }): any;
 }

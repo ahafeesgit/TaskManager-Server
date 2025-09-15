@@ -1,4 +1,4 @@
-name: "CodeQL Security Scan"
+name: "CI Security Pipeline"
 
 on:
   pull_request:
@@ -18,8 +18,8 @@ on:
     - cron: '0 2 * * 0'
 
 jobs:
-  analyze:
-    name: Analyze
+  ci-security:
+    name: Lint, Build, Audit & Security Scan
     runs-on: ubuntu-latest
     timeout-minutes: 360
     permissions:
@@ -38,16 +38,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: ${{ matrix.language }}
-        # Override language selection by uncommenting this and choosing your languages
-        # languages: javascript
-        
-        # Use custom queries from the community
-        queries: security-extended,security-and-quality
-
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -57,12 +47,37 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    # Autobuild attempts to build any compiled languages (C/C++, C#, Go, or Java).
-    # For TypeScript/JavaScript, this step is optional
+    # Linting step - run on all events
+    - name: Run ESLint
+      run: npm run lint
+
+    # Build verification step - run on all events
+    - name: Build project
+      run: npm run build
+
+    # Dependency audit step - only on pushes and scheduled runs to save actions
+    - name: Audit dependencies
+      if: github.event_name == 'push' || github.event_name == 'schedule'
+      run: npm audit --audit-level=moderate
+      continue-on-error: true
+
+    # Initialize CodeQL only for pushes to dev and scheduled runs
+    - name: Initialize CodeQL
+      if: github.event_name == 'push' || github.event_name == 'schedule'
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        # Use custom queries from the community
+        queries: security-extended,security-and-quality
+
+    # Autobuild for CodeQL (only when CodeQL is initialized)
     - name: Autobuild
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: github/codeql-action/autobuild@v3
 
+    # Perform CodeQL Analysis (only when CodeQL is initialized)
     - name: Perform CodeQL Analysis
+      if: github.event_name == 'push' || github.event_name == 'schedule'
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"

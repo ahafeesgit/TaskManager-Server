@@ -1,8 +1,8 @@
-name: "CI Security Pipeline"
+name: 'CI Security Pipeline'
 
 on:
   pull_request:
-    branches: [ "dev" ]
+    branches: ['dev']
     # Only run when there are code changes
     paths:
       - '**/*.ts'
@@ -12,72 +12,64 @@ on:
       - 'package*.json'
       - 'prisma/**'
   push:
-    branches: [ "dev" ]
+    branches: ['dev']
   schedule:
-    # Run weekly scan on Sundays at 2 AM UTC
-    - cron: '0 2 * * 0'
+    # Run monthly scan since Dependabot handles weekly dependency updates
+    - cron: '0 2 1 * *'
 
 jobs:
   ci-security:
-    name: Lint, Build, Audit & Security Scan
+    name: Lint, Build & Security Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 15
     permissions:
       actions: read
       contents: read
       security-events: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ 'javascript' ]
-        # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
-        # Use only 'javascript' which covers TypeScript as well
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    # Linting step - run on all events
-    - name: Run ESLint
-      run: npm run lint
+      # Linting step - run on all events
+      - name: Run ESLint
+        run: npm run lint
 
-    # Build verification step - run on all events
-    - name: Build project
-      run: npm run build
+      # Build verification step - only on PRs to avoid redundancy with CodeQL autobuild
+      - name: Build project
+        if: github.event_name == 'pull_request'
+        run: npm run build
 
-    # Dependency audit step - only on pushes and scheduled runs to save actions
-    - name: Audit dependencies
-      if: github.event_name == 'push' || github.event_name == 'schedule'
-      run: npm audit --audit-level=moderate
-      continue-on-error: true
+      # Quick security check on PRs only (Dependabot handles comprehensive updates)
+      - name: Quick security audit
+        if: github.event_name == 'pull_request'
+        run: npm audit --audit-level=high
+        continue-on-error: true
 
-    # Initialize CodeQL only for pushes to dev and scheduled runs
-    - name: Initialize CodeQL
-      if: github.event_name == 'push' || github.event_name == 'schedule'
-      uses: github/codeql-action/init@v3
-      with:
-        languages: ${{ matrix.language }}
-        # Use custom queries from the community
-        queries: security-extended,security-and-quality
+      # Initialize CodeQL only for pushes to dev and scheduled runs
+      - name: Initialize CodeQL
+        if: github.event_name == 'push' || github.event_name == 'schedule'
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          # Use custom queries from the community
+          queries: security-extended,security-and-quality
 
-    # Autobuild for CodeQL (only when CodeQL is initialized)
-    - name: Autobuild
-      if: github.event_name == 'push' || github.event_name == 'schedule'
-      uses: github/codeql-action/autobuild@v3
+      # Autobuild for CodeQL (only when CodeQL is initialized)
+      - name: Autobuild
+        if: github.event_name == 'push' || github.event_name == 'schedule'
+        uses: github/codeql-action/autobuild@v3
 
-    # Perform CodeQL Analysis (only when CodeQL is initialized)
-    - name: Perform CodeQL Analysis
-      if: github.event_name == 'push' || github.event_name == 'schedule'
-      uses: github/codeql-action/analyze@v3
-      with:
-        category: "/language:${{matrix.language}}"
+      # Perform CodeQL Analysis (only when CodeQL is initialized)
+      - name: Perform CodeQL Analysis
+        if: github.event_name == 'push' || github.event_name == 'schedule'
+        uses: github/codeql-action/analyze@v3

@@ -60,8 +60,6 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: javascript
-          # Use basic queries on PRs, extended on pushes/schedule
-          queries: ${{ github.event_name == 'pull_request' && 'security-only' || 'security-extended,security-and-quality' }}
 
       # Autobuild for CodeQL
       - name: Autobuild

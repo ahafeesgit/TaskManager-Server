@@ -1,0 +1,44 @@
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'sunday'
+      time: '02:00'
+    open-pull-requests-limit: 5
+    reviewers:
+      - 'ahafeesgit' # Replace with your GitHub username if different
+    assignees:
+      - 'ahafeesgit' # Replace with your GitHub username if different
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    # Group updates to reduce PR noise
+    groups:
+      dev-dependencies:
+        patterns:
+          - '@types/*'
+          - 'eslint*'
+          - 'prettier*'
+          - 'typescript'
+          - '@typescript-eslint/*'
+          - 'jest*'
+          - '@nestjs/testing'
+        update-types:
+          - 'minor'
+          - 'patch'
+      production-dependencies:
+        patterns:
+          - '*'
+        exclude-patterns:
+          - '@types/*'
+          - 'eslint*'
+          - 'prettier*'
+          - 'typescript'
+          - '@typescript-eslint/*'
+          - 'jest*'
+          - '@nestjs/testing'
+        update-types:
+          - 'patch'

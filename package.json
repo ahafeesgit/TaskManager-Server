@@ -17,7 +17,12 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "ci:lint": "npm run lint",
+    "ci:build": "npm run build",
+    "ci:audit": "npm audit --audit-level=high",
+    "ci:check": "npm run ci:lint && npm run ci:build && npm run ci:audit",
+    "pre-commit": "npm run ci:check"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

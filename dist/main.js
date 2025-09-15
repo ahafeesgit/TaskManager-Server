@@ -30,7 +30,12 @@ async function bootstrap() {
     await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap().catch((error) => {
-    console.error('Error starting the application:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error('Error starting the application:', errorMessage);
+    if (errorStack) {
+        console.error('Stack trace:', errorStack);
+    }
     process.exit(1);
 });
 //# sourceMappingURL=main.js.map

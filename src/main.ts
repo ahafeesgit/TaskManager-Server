@@ -8,7 +8,8 @@ import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
+  
+  // CodeQL security test - testing automated security scanning
   // Enable global validation pipe (class-validator & class-transformer)
   app.useGlobalPipes(
     new ValidationPipe({
@@ -35,3 +36,4 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
+// CodeQL security test

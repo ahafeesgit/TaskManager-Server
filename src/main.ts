@@ -20,8 +20,10 @@ async function bootstrap() {
 
   // Enable security and utility middleware
   app.use(helmet());
-  app.use(cookieParser());
-  app.use(compression());
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  app.use(cookieParser() as any);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  app.use(compression() as any);
 
   // Swagger configuration
   const config = new DocumentBuilder()
@@ -36,6 +38,13 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error: unknown) => {
-  console.error('Error starting the application:', error);
+  const errorMessage =
+    error instanceof Error ? error.message : 'Unknown error occurred';
+  const errorStack = error instanceof Error ? error.stack : undefined;
+
+  console.error('Error starting the application:', errorMessage);
+  if (errorStack) {
+    console.error('Stack trace:', errorStack);
+  }
   process.exit(1);
 });

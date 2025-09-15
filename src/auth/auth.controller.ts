@@ -68,7 +68,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user info (JWT protected)' })
   @ApiResponse({ status: 200, description: 'Current user info' })
-  getProfile(@Request() req: { user: any }) {
+  getProfile(@Request() req: { user: any }): any {
     return req.user;
   }
 }

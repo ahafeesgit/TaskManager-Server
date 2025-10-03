@@ -5,7 +5,7 @@ node_modules
 /generated/prisma
 
 # Build output
-dist/
+
 build/
 
 # TypeScript build info

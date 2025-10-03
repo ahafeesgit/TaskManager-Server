@@ -27,7 +27,7 @@ pids
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
-
+dist/
 # Dependency directories
 node_modules/
 

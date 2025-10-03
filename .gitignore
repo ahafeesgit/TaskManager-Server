@@ -5,7 +5,7 @@ node_modules
 /generated/prisma
 
 # Build output
-dist/
+
 build/
 
 # TypeScript build info
@@ -27,7 +27,7 @@ pids
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
-
+dist/
 # Dependency directories
 node_modules/
 

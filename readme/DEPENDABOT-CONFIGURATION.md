@@ -76,16 +76,18 @@ updates:
 ```yaml
 open-pull-requests-limit: 5
 reviewers:
-  - 'ahafeesgit'
+  - 'ahafeesgit' # Replace with your GitHub username
 assignees:
-  - 'ahafeesgit'
+  - 'ahafeesgit' # Replace with your GitHub username
 ```
 
 **Configuration Details:**
 
 - **Limit**: Maximum 5 open PRs at once (prevents overwhelming)
-- **Reviewers**: Auto-assigns `ahafeesgit` for review
-- **Assignees**: Auto-assigns `ahafeesgit` as responsible party
+- **Reviewers**: Auto-assigns repository maintainer for review
+- **Assignees**: Auto-assigns repository maintainer as responsible party
+
+> **Template Customization:** Replace `'ahafeesgit'` with your GitHub username when using this as a template.
 
 ### Commit Message Formatting
 

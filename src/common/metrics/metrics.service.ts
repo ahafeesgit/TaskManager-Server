@@ -74,8 +74,14 @@ export class MetricsService {
     this.databaseConnections.set(count);
   }
 
-  getMetrics(): Promise<string> {
-    return register.metrics();
+  async getMetrics(): Promise<string> {
+    try {
+      return await register.metrics();
+    } catch (error) {
+      console.error('Failed to collect metrics:', error);
+      // Return a safe fallback value; Prometheus expects a 200 with text/plain, even if empty or error
+      return '# Error: Failed to collect metrics\n';
+    }
   }
 
   clearMetrics(): void {

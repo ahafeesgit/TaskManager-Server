@@ -7,6 +7,7 @@ import {
   DiskHealthIndicator,
 } from '@nestjs/terminus';
 import { PrismaService } from '../prisma/prisma.service';
+import { PrismaClient } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('health')
@@ -28,7 +29,8 @@ export class HealthController {
   check() {
     return this.health.check([
       // Database health check
-      () => this.prismaHealth.pingCheck('database', this.prisma),
+      () =>
+        this.prismaHealth.pingCheck('database', this.prisma as PrismaClient),
 
       // Memory health check (heap should not use more than 150MB)
       () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024),
@@ -53,7 +55,8 @@ export class HealthController {
   ready() {
     return this.health.check([
       // Only check database for readiness
-      () => this.prismaHealth.pingCheck('database', this.prisma),
+      () =>
+        this.prismaHealth.pingCheck('database', this.prisma as PrismaClient),
     ]);
   }
 

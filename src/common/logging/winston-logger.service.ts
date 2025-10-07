@@ -161,10 +161,60 @@ export class WinstonLoggerService
     duration: number,
     context = 'Database',
   ): void {
+    // Only log database queries in development or when explicitly enabled
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isQueryLoggingEnabled = process.env.LOG_DATABASE_QUERIES === 'true';
+
+    if (!isDevelopment && !isQueryLoggingEnabled) {
+      // In production, only log basic query metrics without the actual query
+      this.winston.debug('Database Query Executed', {
+        context,
+        duration: `${duration}ms`,
+        queryLength: query.length,
+      });
+      return;
+    }
+
+    // Sanitize query to remove potential sensitive data
+    const sanitizedQuery = this.sanitizeQuery(query);
+
     this.winston.debug('Database Query', {
       context,
-      query,
+      query: sanitizedQuery,
       duration: `${duration}ms`,
+      originalLength: query.length,
     });
+  }
+
+  private sanitizeQuery(query: string): string {
+    // Remove or mask common patterns that might contain sensitive data
+    return (
+      query
+        // Replace string literals that might contain sensitive data
+        .replace(/'([^']*password[^']*)'/gi, "'[PASSWORD_REDACTED]'")
+        .replace(/'([^']*token[^']*)'/gi, "'[TOKEN_REDACTED]'")
+        .replace(/'([^']*secret[^']*)'/gi, "'[SECRET_REDACTED]'")
+        .replace(/'([^']*key[^']*)'/gi, "'[KEY_REDACTED]'")
+        // Replace email patterns
+        .replace(/'([^']*@[^']*\.[^']*)'/gi, "'[EMAIL_REDACTED]'")
+        // Replace phone number patterns
+        .replace(/'(\+?[\d\s\-\(\)]{10,})'/gi, "'[PHONE_REDACTED]'")
+        // Replace credit card patterns
+        .replace(
+          /'(\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4})'/gi,
+          "'[CARD_REDACTED]'",
+        )
+        // Replace long string values that might be sensitive (>50 chars)
+        .replace(/'([^']{50,})'/gi, (match, group) => {
+          return `'[LONG_VALUE_REDACTED_${group.length}_CHARS]'`;
+        })
+        // Replace UUID patterns that might be sensitive IDs
+        .replace(
+          /'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})'/gi,
+          "'[UUID_REDACTED]'",
+        )
+        // Truncate very long queries
+        .substring(0, 2000) + (query.length > 2000 ? '... [TRUNCATED]' : '')
+    );
   }
 }

@@ -11,11 +11,11 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import {
   LoggingModule,
-  WinstonLoggerService,
   LoggingInterceptor,
 } from './common/logging';
-import { AllExceptionsFilter, PrismaExceptionFilter } from './common/filters';
+import { AllExceptionsFilter, PrismaExceptionFilter, GlobalExceptionFilter } from './common/filters';
 import { MetricsModule, MetricsInterceptor } from './common/metrics';
+import { ResponseInterceptor } from './common/interceptors';
 
 @Module({
   imports: [
@@ -39,11 +39,11 @@ import { MetricsModule, MetricsInterceptor } from './common/metrics';
     PrismaService,
     {
       provide: APP_FILTER,
-      useClass: AllExceptionsFilter,
+      useClass: GlobalExceptionFilter,
     },
     {
-      provide: APP_FILTER,
-      useClass: PrismaExceptionFilter,
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,

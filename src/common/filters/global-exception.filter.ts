@@ -9,11 +9,18 @@ import {
 import { Response } from 'express';
 import { ApiResponse } from '../interfaces/api-response.interface';
 
+// Define interface for HTTP exception response
+interface HttpExceptionResponse {
+  message?: string | string[];
+  error?: string;
+  statusCode?: number;
+}
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
-  catch(exception: any, host: ArgumentsHost) {
+  catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 
@@ -23,33 +30,34 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      
+
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        const responseObj = exceptionResponse as any;
-        
+        const responseObj = exceptionResponse as HttpExceptionResponse;
+
         // Handle validation errors (array of messages)
         if (Array.isArray(responseObj.message)) {
-          messages = responseObj.message;
+          messages = responseObj.message.map((msg) => String(msg));
         } else if (responseObj.message) {
-          messages = [responseObj.message];
+          messages = [String(responseObj.message)];
         } else {
           messages = [exception.message];
         }
       } else {
-        messages = [exceptionResponse as string];
+        messages = [String(exceptionResponse)];
       }
     } else {
+      // Handle non-HTTP exceptions
+      const error =
+        exception instanceof Error ? exception : new Error('Unknown error');
+
       // Log unexpected errors
-      this.logger.error(
-        `Unexpected error: ${exception?.message || 'Unknown error'}`,
-        exception?.stack,
-      );
-      
+      this.logger.error(`Unexpected error: ${error.message}`, error.stack);
+
       // Don't expose internal error details in production
       if (process.env.NODE_ENV === 'production') {
         messages = ['Internal server error'];
       } else {
-        messages = [exception?.message || 'Unknown error'];
+        messages = [error.message];
       }
     }
 

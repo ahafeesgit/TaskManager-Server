@@ -4,7 +4,7 @@ import {
   ArgumentsHost,
   HttpStatus,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { WinstonLoggerService } from '../logging/winston-logger.service';
 
@@ -15,7 +15,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
   catch(exception: PrismaClientKnownRequestError, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest();
+    const request = ctx.getRequest<Request>();
 
     const { code, meta } = exception;
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
@@ -82,7 +82,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     return 'A record with these values already exists';
   }
 
-  private getErrorName(status: number): string {
+  private getErrorName(status: HttpStatus): string {
     switch (status) {
       case HttpStatus.BAD_REQUEST:
         return 'Bad Request';

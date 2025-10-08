@@ -1,49 +1,76 @@
 import { Injectable } from '@nestjs/common';
 import {
-  register,
-  collectDefaultMetrics,
-  Counter,
-  Histogram,
-  Gauge,
-} from 'prom-client';
+  makeCounterProvider,
+  makeHistogramProvider,
+  makeGaugeProvider,
+  InjectMetric,
+} from '@willsoto/nestjs-prometheus';
+import { Counter, Histogram, Gauge, register } from 'prom-client';
+
+export const HTTP_REQUEST_DURATION = 'http_request_duration_seconds';
+export const HTTP_REQUESTS_TOTAL = 'http_requests_total';
+export const ACTIVE_CONNECTIONS = 'active_connections';
+export const DATABASE_CONNECTIONS = 'database_connections';
+
+// Create metric providers
+export const httpRequestDurationProvider = makeHistogramProvider({
+  name: HTTP_REQUEST_DURATION,
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code'],
+  // Optimized buckets for typical web application response times
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+});
+
+export const httpRequestsTotalProvider = makeCounterProvider({
+  name: HTTP_REQUESTS_TOTAL,
+  help: 'Total number of HTTP requests',
+  labelNames: ['method', 'route', 'status_code'],
+});
+
+export const activeConnectionsProvider = makeGaugeProvider({
+  name: ACTIVE_CONNECTIONS,
+  help: 'Number of active connections',
+});
+
+export const databaseConnectionsProvider = makeGaugeProvider({
+  name: DATABASE_CONNECTIONS,
+  help: 'Number of database connections',
+});
+
+// Additional performance and error tracking metrics
+export const ERROR_RATE = 'http_requests_errors_total';
+export const MEMORY_USAGE = 'memory_usage_bytes';
+
+export const errorRateProvider = makeCounterProvider({
+  name: ERROR_RATE,
+  help: 'Total number of HTTP request errors',
+  labelNames: ['method', 'route', 'status_code', 'error_type'],
+});
+
+export const memoryUsageProvider = makeGaugeProvider({
+  name: MEMORY_USAGE,
+  help: 'Memory usage in bytes',
+  labelNames: ['type'], // heap_used, heap_total, rss, external
+});
 
 @Injectable()
 export class MetricsService {
-  private readonly httpRequestDuration: Histogram<string>;
-  private readonly httpRequestsTotal: Counter<string>;
-  private readonly activeConnections: Gauge<string>;
-  private readonly databaseConnections: Gauge<string>;
-
-  constructor() {
-    // Collect default metrics (CPU, memory, etc.)
-    collectDefaultMetrics();
-
-    // HTTP request duration histogram
-    this.httpRequestDuration = new Histogram({
-      name: 'http_request_duration_seconds',
-      help: 'Duration of HTTP requests in seconds',
-      labelNames: ['method', 'route', 'status_code'],
-      buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10],
-    });
-
-    // HTTP requests total counter
-    this.httpRequestsTotal = new Counter({
-      name: 'http_requests_total',
-      help: 'Total number of HTTP requests',
-      labelNames: ['method', 'route', 'status_code'],
-    });
-
-    // Active connections gauge
-    this.activeConnections = new Gauge({
-      name: 'active_connections',
-      help: 'Number of active connections',
-    });
-
-    // Database connections gauge
-    this.databaseConnections = new Gauge({
-      name: 'database_connections',
-      help: 'Number of database connections',
-    });
+  constructor(
+    @InjectMetric(HTTP_REQUEST_DURATION)
+    private readonly httpRequestDuration: Histogram<string>,
+    @InjectMetric(HTTP_REQUESTS_TOTAL)
+    private readonly httpRequestsTotal: Counter<string>,
+    @InjectMetric(ACTIVE_CONNECTIONS)
+    private readonly activeConnections: Gauge<string>,
+    @InjectMetric(DATABASE_CONNECTIONS)
+    private readonly databaseConnections: Gauge<string>,
+    @InjectMetric(ERROR_RATE)
+    private readonly errorRate: Counter<string>,
+    @InjectMetric(MEMORY_USAGE)
+    private readonly memoryUsage: Gauge<string>,
+  ) {
+    // Start memory monitoring (low frequency to minimize impact)
+    this.startMemoryMonitoring();
   }
 
   recordHttpRequest(
@@ -86,5 +113,64 @@ export class MetricsService {
 
   clearMetrics(): void {
     register.clear();
+  }
+
+  // Record HTTP errors for error rate tracking
+  recordHttpError(
+    method: string,
+    route: string,
+    statusCode: number,
+    errorType: string = 'unknown',
+  ): void {
+    const labels = {
+      method: method.toLowerCase(),
+      route,
+      status_code: statusCode.toString(),
+      error_type: errorType,
+    };
+
+    this.errorRate.inc(labels);
+  }
+
+  // Memory monitoring with minimal performance impact
+  private startMemoryMonitoring(): void {
+    // Only monitor in production or when explicitly enabled
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      process.env.METRICS_MEMORY_MONITORING !== 'true'
+    ) {
+      return;
+    }
+
+    // Monitor memory every 30 seconds to minimize performance impact
+    setInterval(() => {
+      try {
+        const memUsage = process.memoryUsage();
+
+        this.memoryUsage.set({ type: 'heap_used' }, memUsage.heapUsed);
+        this.memoryUsage.set({ type: 'heap_total' }, memUsage.heapTotal);
+        this.memoryUsage.set({ type: 'rss' }, memUsage.rss);
+        this.memoryUsage.set({ type: 'external' }, memUsage.external);
+      } catch (error) {
+        // Silently fail to avoid affecting application performance
+        console.warn('Memory monitoring failed:', error.message);
+      }
+    }, 30000); // 30 seconds interval
+  }
+
+  // Get comprehensive metrics summary for debugging
+  getMetricsSummary(): {
+    httpRequests: number;
+    activeConnections: number;
+    databaseConnections: number;
+    memoryMB: number;
+  } {
+    const memUsage = process.memoryUsage();
+    return {
+      httpRequests: (this.httpRequestsTotal as any)._values?.size || 0,
+      activeConnections: (this.activeConnections as any)._value || 0,
+      databaseConnections: (this.databaseConnections as any)._value || 0,
+      memoryMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+    };
   }
 }

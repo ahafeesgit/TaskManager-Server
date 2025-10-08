@@ -87,7 +87,7 @@ dependencies=(
     "@nestjs/terminus"
     "prisma"
     "winston"
-    "prom-client"
+    "@willsoto/nestjs-prometheus"
     "bcrypt"
     "passport-jwt"
 )

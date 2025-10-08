@@ -1,0 +1,58 @@
+# .dockerignore
+# =============================================================================
+# Files and directories to ignore when building Docker images
+# =============================================================================
+
+# Node modules
+node_modules
+npm-debug.log*
+
+# Build outputs
+dist
+build
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs
+*.log
+
+# Coverage reports
+coverage
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs
+
+# Testing
+test
+coverage
+
+# Development files
+src/**/*.spec.ts
+src/**/*.test.ts
+
+# Prisma generated files (will be generated in container)
+generated
+
+# Other unnecessary files
+README.md
+CHANGELOG.md
+LICENSE

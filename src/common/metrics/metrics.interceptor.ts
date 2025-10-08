@@ -13,7 +13,7 @@ import { MetricsService } from './metrics.service';
 export class MetricsInterceptor implements NestInterceptor {
   constructor(private readonly metricsService: MetricsService) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     // Skip metrics collection for metrics endpoint to avoid recursion
     const request = context.switchToHttp().getRequest();
     if (request.url?.includes('/metrics')) {
@@ -33,37 +33,42 @@ export class MetricsInterceptor implements NestInterceptor {
         const { statusCode } = response;
 
         // Normalize route path to avoid high cardinality
-        const normalizedRoute = this.normalizeRoute(route?.path || request.url);
+        const normalizedRoute = this.normalizeRoute(
+          route?.path || request.url || 'unknown',
+        );
 
         this.metricsService.recordHttpRequest(
-          method,
+          method || 'unknown',
           normalizedRoute,
-          statusCode,
+          statusCode || 500,
           duration,
         );
       }),
-      catchError((error) => {
+      catchError((error: unknown) => {
         // Record error metrics
         const endTime = process.hrtime.bigint();
         const duration = Number(endTime - startTime) / 1_000_000;
 
         const { method, route } = request;
         const statusCode = response.statusCode || 500;
-        const normalizedRoute = this.normalizeRoute(route?.path || request.url);
+        const normalizedRoute = this.normalizeRoute(
+          route?.path || request.url || 'unknown',
+        );
 
         this.metricsService.recordHttpRequest(
-          method,
+          method || 'unknown',
           normalizedRoute,
           statusCode,
           duration,
         );
 
         // Record error-specific metrics
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
         this.metricsService.recordHttpError(
-          method,
+          method || 'unknown',
           normalizedRoute,
           statusCode,
-          error.name || 'UnknownError',
+          errorName,
         );
 
         return throwError(() => error);

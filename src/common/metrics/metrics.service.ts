@@ -153,7 +153,9 @@ export class MetricsService {
         this.memoryUsage.set({ type: 'external' }, memUsage.external);
       } catch (error) {
         // Silently fail to avoid affecting application performance
-        console.warn('Memory monitoring failed:', error.message);
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        console.warn('Memory monitoring failed:', errorMessage);
       }
     }, 30000); // 30 seconds interval
   }
@@ -166,10 +168,37 @@ export class MetricsService {
     memoryMB: number;
   } {
     const memUsage = process.memoryUsage();
+
+    // Type-safe access to metric internal values for debugging
+    let httpRequests = 0;
+    let activeConnections = 0;
+    let databaseConnections = 0;
+
+    try {
+      // Safe access to internal metric values (these are implementation details)
+      const totalCounter = this.httpRequestsTotal as unknown as {
+        _values?: Map<string, number>;
+      };
+      httpRequests = totalCounter._values?.size || 0;
+
+      const activeGauge = this.activeConnections as unknown as {
+        _value?: number;
+      };
+      activeConnections = activeGauge._value || 0;
+
+      const dbGauge = this.databaseConnections as unknown as {
+        _value?: number;
+      };
+      databaseConnections = dbGauge._value || 0;
+    } catch {
+      // If internal structure changes, gracefully fall back to 0 values
+      // This is for debugging only, so failures are acceptable
+    }
+
     return {
-      httpRequests: (this.httpRequestsTotal as any)._values?.size || 0,
-      activeConnections: (this.activeConnections as any)._value || 0,
-      databaseConnections: (this.databaseConnections as any)._value || 0,
+      httpRequests,
+      activeConnections,
+      databaseConnections,
       memoryMB: Math.round(memUsage.heapUsed / 1024 / 1024),
     };
   }

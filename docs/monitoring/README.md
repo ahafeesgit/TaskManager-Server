@@ -62,7 +62,7 @@ export HEALTH_MEMORY_RSS_THRESHOLD=209715200   # 200MB
 ## 🔗 Related Documentation
 
 - [Scripts Documentation](../scripts/README.md) - Deployment and maintenance scripts
-- [Health Check Integration](../../src/health/) - Source code implementation
+- [Health Check Integration](../../src/common/health/) - Source code implementation
 - [Metrics Implementation](../../src/common/metrics/) - Prometheus metrics code
 
 ## 📊 Monitoring Stack Integration
@@ -85,7 +85,7 @@ export HEALTH_MEMORY_RSS_THRESHOLD=209715200   # 200MB
 - Uses `/health/ready` for readiness probes
 - Automatic pod restart and traffic routing
 
-### Docker
+### Container Orchestration
 
 - Health checks using liveness endpoint
 - Container status monitoring
@@ -96,7 +96,7 @@ export HEALTH_MEMORY_RSS_THRESHOLD=209715200   # 200MB
 ✅ **Comprehensive Health Checks** - Database, memory, disk monitoring  
 ✅ **Performance Metrics** - Request timing, error rates, resource usage  
 ✅ **Production Optimized** - Minimal overhead, efficient collection  
-✅ **Cloud Native** - Kubernetes, Docker, orchestration ready  
+✅ **Cloud Native** - Kubernetes, container orchestration ready  
 ✅ **Industry Standards** - Prometheus, OpenAPI, container best practices  
 ✅ **Troubleshooting** - Debug endpoints, comprehensive error handling
 

@@ -1,6 +1,20 @@
-import { Injectable, LoggerService, ConsoleLogger } from '@nestjs/common';
+import {
+  Injectable,
+  LoggerService,
+  ConsoleLogger,
+  Optional,
+} from '@nestjs/common';
 import * as winston from 'winston';
 import 'winston-daily-rotate-file';
+import type {
+  LoggingConfig,
+  RequestLogData,
+  DatabaseLogData,
+  ErrorLogData,
+  LogContext,
+} from './interfaces/logging.interface';
+import { LogSanitizerService } from './services/log-sanitizer.service';
+import { LogFormatterService } from './services/log-formatter.service';
 
 @Injectable()
 export class WinstonLoggerService
@@ -8,10 +22,31 @@ export class WinstonLoggerService
   implements LoggerService
 {
   private readonly winston: winston.Logger;
+  private readonly sanitizer: LogSanitizerService;
+  private readonly formatter: LogFormatterService;
+  private readonly config: LoggingConfig;
 
-  constructor() {
+  constructor(@Optional() config?: LoggingConfig) {
     super();
+    this.config = this.mergeWithDefaults(config);
+    this.sanitizer = new LogSanitizerService(this.config);
+    this.formatter = new LogFormatterService();
     this.winston = this.createWinstonLogger();
+  }
+
+  private mergeWithDefaults(config?: LoggingConfig): LoggingConfig {
+    return {
+      level: process.env.LOG_LEVEL || 'info',
+      enableFileLogging: process.env.LOG_FILE_ENABLED === 'true',
+      enableConsoleLogging: true,
+      logDirectory: 'logs',
+      maxFileSize: '20m',
+      maxFiles: '30d',
+      enableQueryLogging: process.env.LOG_DATABASE_QUERIES === 'true',
+      enableRequestLogging: true,
+      sensitiveFields: ['password', 'token', 'secret', 'key'],
+      ...config,
+    };
   }
 
   private createWinstonLogger(): winston.Logger {
@@ -21,54 +56,56 @@ export class WinstonLoggerService
       winston.format.json(),
       winston.format.printf(
         ({ timestamp, level, message, context, trace, ...meta }) => {
-          const logObject: Record<string, unknown> = {
-            timestamp,
-            level,
-            context,
-            message,
-            ...meta,
-          };
-
-          if (trace) {
-            logObject.trace = trace;
-          }
-
-          return JSON.stringify(logObject);
+          const logEntry = this.formatter.formatLogEntry(
+            String(level),
+            String(message),
+            context ? String(context) : undefined,
+            {
+              trace,
+              ...meta,
+            },
+          );
+          return JSON.stringify(logEntry);
         },
       ),
     );
 
-    const transports: winston.transport[] = [
-      // Console transport
-      new winston.transports.Console({
-        format: winston.format.combine(
-          winston.format.colorize({ all: true }),
-          winston.format.printf(({ timestamp, level, message, context }) => {
-            const ctx = context
-              ? `[${typeof context === 'string' ? context : JSON.stringify(context)}] `
-              : '';
-            const msgStr =
-              typeof message === 'string' ? message : String(message);
-            const tsStr =
-              typeof timestamp === 'string' ? timestamp : String(timestamp);
-            const levelStr = typeof level === 'string' ? level : String(level);
-            return `${tsStr} ${levelStr}: ${ctx}${msgStr}`;
-          }),
-        ),
-      }),
-    ];
+    const transports: winston.transport[] = [];
 
-    // File transports (only if enabled via environment)
-    if (process.env.LOG_FILE_ENABLED === 'true') {
+    // Console transport
+    if (this.config.enableConsoleLogging) {
+      transports.push(
+        new winston.transports.Console({
+          format: winston.format.combine(
+            winston.format.colorize({ all: true }),
+            winston.format.printf(({ timestamp, level, message, context }) => {
+              const ctx = context
+                ? `[${typeof context === 'string' ? context : JSON.stringify(context)}] `
+                : '';
+              const msgStr =
+                typeof message === 'string' ? message : String(message);
+              const tsStr =
+                typeof timestamp === 'string' ? timestamp : String(timestamp);
+              const levelStr =
+                typeof level === 'string' ? level : String(level);
+              return `${tsStr} ${levelStr}: ${ctx}${msgStr}`;
+            }),
+          ),
+        }),
+      );
+    }
+
+    // File transports
+    if (this.config.enableFileLogging) {
       // Error logs
       transports.push(
         new winston.transports.DailyRotateFile({
-          filename: 'logs/error-%DATE%.log',
+          filename: `${this.config.logDirectory}/error-%DATE%.log`,
           datePattern: 'YYYY-MM-DD',
           level: 'error',
           format: logFormat,
-          maxSize: '20m',
-          maxFiles: '14d',
+          maxSize: this.config.maxFileSize,
+          maxFiles: this.config.maxFiles,
           zippedArchive: true,
         }),
       );
@@ -76,46 +113,50 @@ export class WinstonLoggerService
       // Combined logs
       transports.push(
         new winston.transports.DailyRotateFile({
-          filename: 'logs/combined-%DATE%.log',
+          filename: `${this.config.logDirectory}/combined-%DATE%.log`,
           datePattern: 'YYYY-MM-DD',
           format: logFormat,
-          maxSize: '20m',
-          maxFiles: '30d',
+          maxSize: this.config.maxFileSize,
+          maxFiles: this.config.maxFiles,
           zippedArchive: true,
         }),
       );
     }
 
+    const exceptionHandlers: winston.transport[] = [
+      new winston.transports.Console(),
+    ];
+
+    const rejectionHandlers: winston.transport[] = [
+      new winston.transports.Console(),
+    ];
+
+    if (this.config.enableFileLogging) {
+      exceptionHandlers.push(
+        new winston.transports.DailyRotateFile({
+          filename: `${this.config.logDirectory}/exceptions-%DATE%.log`,
+          datePattern: 'YYYY-MM-DD',
+          maxSize: this.config.maxFileSize,
+          maxFiles: '14d',
+        }) as winston.transport,
+      );
+
+      rejectionHandlers.push(
+        new winston.transports.DailyRotateFile({
+          filename: `${this.config.logDirectory}/rejections-%DATE%.log`,
+          datePattern: 'YYYY-MM-DD',
+          maxSize: this.config.maxFileSize,
+          maxFiles: '14d',
+        }) as winston.transport,
+      );
+    }
+
     return winston.createLogger({
-      level: process.env.LOG_LEVEL || 'info',
+      level: this.config.level,
       format: logFormat,
       transports,
-      exceptionHandlers: [
-        new winston.transports.Console(),
-        ...(process.env.LOG_FILE_ENABLED === 'true'
-          ? [
-              new winston.transports.DailyRotateFile({
-                filename: 'logs/exceptions-%DATE%.log',
-                datePattern: 'YYYY-MM-DD',
-                maxSize: '20m',
-                maxFiles: '14d',
-              }),
-            ]
-          : []),
-      ],
-      rejectionHandlers: [
-        new winston.transports.Console(),
-        ...(process.env.LOG_FILE_ENABLED === 'true'
-          ? [
-              new winston.transports.DailyRotateFile({
-                filename: 'logs/rejections-%DATE%.log',
-                datePattern: 'YYYY-MM-DD',
-                maxSize: '20m',
-                maxFiles: '14d',
-              }),
-            ]
-          : []),
-      ],
+      exceptionHandlers,
+      rejectionHandlers,
     });
   }
 
@@ -144,35 +185,44 @@ export class WinstonLoggerService
     this.winston.verbose(msgStr, { context });
   }
 
-  // Additional utility methods
+  // Enhanced utility methods
   logRequest(
     req: Record<string, unknown>,
     res: Record<string, unknown>,
     responseTime: number,
   ): void {
-    const method = req.method as string;
-    const originalUrl = req.originalUrl as string;
-    const ip = req.ip as string;
-    const headers = req.headers as Record<string, string>;
-    const statusCode = res.statusCode as number;
+    if (!this.config.enableRequestLogging) return;
+
+    const requestData: RequestLogData = {
+      method: req.method as string,
+      url: req.originalUrl as string,
+      statusCode: res.statusCode as number,
+      responseTime,
+      ip: req.ip as string,
+      userAgent:
+        (req.headers as Record<string, string>)['user-agent'] || 'unknown',
+      userId: (req as any).user?.id,
+      correlationId: (req as any).correlationId,
+    };
+
+    const sanitizedHeaders = this.sanitizer.sanitizeHeaders(
+      req.headers as Record<string, any>,
+    );
+    const formattedLog = this.formatter.formatRequestLog(requestData);
 
     this.winston.info('HTTP Request', {
-      context: 'HTTP',
-      method,
-      url: originalUrl,
-      statusCode,
-      responseTime: `${responseTime}ms`,
-      ip,
-      userAgent: headers['user-agent'] || 'unknown',
+      ...formattedLog,
+      headers: sanitizedHeaders,
     });
   }
 
-  logError(error: Error, context?: string): void {
-    this.winston.error(error.message, {
+  logError(error: Error, context?: string, userId?: string): void {
+    const formattedError = this.formatter.formatErrorLog(
+      error,
       context,
-      stack: error.stack,
-      name: error.name,
-    });
+      userId,
+    );
+    this.winston.error(error.message, formattedError);
   }
 
   logDatabaseQuery(
@@ -180,60 +230,129 @@ export class WinstonLoggerService
     duration: number,
     context = 'Database',
   ): void {
-    // Only log database queries in development or when explicitly enabled
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    const isQueryLoggingEnabled = process.env.LOG_DATABASE_QUERIES === 'true';
-
-    if (!isDevelopment && !isQueryLoggingEnabled) {
-      // In production, only log basic query metrics without the actual query
+    if (!this.config.enableQueryLogging) {
+      // Only log basic query metrics without the actual query
       this.winston.debug('Database Query Executed', {
         context,
-        duration: `${duration}ms`,
+        duration: this.formatter.formatDuration(duration),
         queryLength: query.length,
       });
       return;
     }
 
-    // Sanitize query to remove potential sensitive data
-    const sanitizedQuery = this.sanitizeQuery(query);
+    const sanitizedQuery = this.sanitizer.sanitizeQuery(query);
+    const formattedLog = this.formatter.formatDatabaseLog({
+      query: sanitizedQuery,
+      duration,
+    });
 
     this.winston.debug('Database Query', {
       context,
-      query: sanitizedQuery,
-      duration: `${duration}ms`,
+      ...formattedLog,
       originalLength: query.length,
     });
   }
 
-  private sanitizeQuery(query: string): string {
-    // Remove or mask common patterns that might contain sensitive data
-    const sanitized = query
-      // Replace string literals that might contain sensitive data
-      .replace(/'([^']*password[^']*)'/gi, "'[PASSWORD_REDACTED]'")
-      .replace(/'([^']*token[^']*)'/gi, "'[TOKEN_REDACTED]'")
-      .replace(/'([^']*secret[^']*)'/gi, "'[SECRET_REDACTED]'")
-      .replace(/'([^']*key[^']*)'/gi, "'[KEY_REDACTED]'")
-      // Replace email patterns
-      .replace(/'([^']*@[^']*\.[^']*)'/gi, "'[EMAIL_REDACTED]'")
-      // Replace phone number patterns
-      .replace(/'(\+?[\d\s\-()]{10,})'/gi, "'[PHONE_REDACTED]'")
-      // Replace credit card patterns
-      .replace(
-        /'(\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4})'/gi,
-        "'[CARD_REDACTED]'",
-      )
-      // Replace long string values that might be sensitive (>50 chars)
-      .replace(/'([^']{50,})'/gi, (match: string, group: string) => {
-        return `'[LONG_VALUE_REDACTED_${group.length}_CHARS]'`;
-      })
-      // Replace UUID patterns that might be sensitive IDs
-      .replace(
-        /'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})'/gi,
-        "'[UUID_REDACTED]'",
-      );
+  // New enhanced methods
+  logEvent(event: string, data?: any, context?: string): void {
+    const formattedLog = this.formatter.formatEventLog(
+      event,
+      this.sanitizer.sanitizeObject(data),
+      context,
+    );
+    this.winston.info('Application Event', formattedLog);
+  }
 
-    // Truncate very long queries
-    const truncated = sanitized.substring(0, 2000);
-    return truncated + (query.length > 2000 ? '... [TRUNCATED]' : '');
+  logPerformance(
+    metric: string,
+    value: number,
+    unit = 'ms',
+    context?: string,
+  ): void {
+    const formattedLog = this.formatter.formatPerformanceLog(
+      metric,
+      value,
+      unit,
+      context,
+    );
+    this.winston.info('Performance Metric', formattedLog);
+  }
+
+  logSecurity(
+    event: string,
+    data?: any,
+    severity: 'info' | 'warn' | 'error' = 'info',
+  ): void {
+    const formattedLog = this.formatter.formatSecurityLog(
+      event,
+      this.sanitizer.sanitizeObject(data),
+      severity,
+    );
+
+    switch (severity) {
+      case 'error':
+        this.winston.error('Security Event', formattedLog);
+        break;
+      case 'warn':
+        this.winston.warn('Security Event', formattedLog);
+        break;
+      default:
+        this.winston.info('Security Event', formattedLog);
+    }
+  }
+
+  logUserAction(
+    userId: string,
+    action: string,
+    data?: any,
+    context?: string,
+  ): void {
+    const sanitizedData = this.sanitizer.sanitizeObject(data);
+    this.winston.info('User Action', {
+      type: 'user_action',
+      userId,
+      action,
+      data: sanitizedData,
+      context,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  logMemoryUsage(context?: string): void {
+    const memoryUsage = process.memoryUsage();
+    this.winston.debug('Memory Usage', {
+      type: 'memory_usage',
+      context: context || 'System',
+      heapUsed: this.formatter.formatMemoryUsage(memoryUsage.heapUsed),
+      heapTotal: this.formatter.formatMemoryUsage(memoryUsage.heapTotal),
+      rss: this.formatter.formatMemoryUsage(memoryUsage.rss),
+      external: this.formatter.formatMemoryUsage(memoryUsage.external),
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  createChildLogger(context: string): WinstonLoggerService {
+    // Create a child logger with the same configuration but different context
+    const childLogger = new WinstonLoggerService(this.config);
+    childLogger.setContext(context);
+    return childLogger;
+  }
+
+  // Correlation ID support
+  withCorrelationId(correlationId: string) {
+    return {
+      log: (message: any, context?: string) => {
+        this.winston.info(String(message), { context, correlationId });
+      },
+      error: (message: any, trace?: string, context?: string) => {
+        this.winston.error(String(message), { context, trace, correlationId });
+      },
+      warn: (message: any, context?: string) => {
+        this.winston.warn(String(message), { context, correlationId });
+      },
+      debug: (message: any, context?: string) => {
+        this.winston.debug(String(message), { context, correlationId });
+      },
+    };
   }
 }

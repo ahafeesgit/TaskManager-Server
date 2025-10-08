@@ -235,12 +235,9 @@ scrape_configs:
     scrape_interval: 15s
 ```
 
-### Docker Health Check
+### Health Check Integration
 
-```dockerfile
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/metrics || exit 1
-```
+The metrics endpoint can be used for health monitoring in container environments.
 
 ## 🎯 **Best Practices Implemented**
 

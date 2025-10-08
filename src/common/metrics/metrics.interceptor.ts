@@ -3,73 +3,118 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
-import { MetricsService } from './metrics.service';
+import { MetricsService, METRICS_CONFIG } from './metrics.service';
+import type {
+  MetricsConfig,
+  HttpMetricsData,
+  ErrorMetricsData,
+} from './interfaces/metrics.interface';
 
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {
-  constructor(private readonly metricsService: MetricsService) {}
+  constructor(
+    private readonly metricsService: MetricsService,
+    @Optional()
+    @Inject(METRICS_CONFIG)
+    private readonly config?: MetricsConfig,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    // Skip metrics collection for metrics endpoint to avoid recursion
-    const request = context.switchToHttp().getRequest();
-    if (request.url?.includes('/metrics')) {
+    // Skip if metrics are disabled
+    if (
+      !this.metricsService.isEnabled() ||
+      this.config?.enableHttpMetrics === false
+    ) {
       return next.handle();
     }
 
+    const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
-    const startTime = process.hrtime.bigint(); // More precise timing
+
+    // Skip metrics collection for excluded routes
+    const url = request.url || '';
+    if (this.isExcludedRoute(url)) {
+      return next.handle();
+    }
+
+    const startTime = process.hrtime.bigint();
+
+    // Extract additional context
+    const correlationId =
+      request.headers['x-correlation-id'] ||
+      request.headers['x-request-id'] ||
+      this.generateCorrelationId();
+
+    const userId = request.user?.id || request.user?.sub;
+    const userAgent = request.headers['user-agent'];
+    const ip = this.getClientIp(request);
+
+    // Increment active connections
+    this.metricsService.incrementActiveConnections();
 
     return next.handle().pipe(
       tap(() => {
-        // Use high-resolution time for better accuracy
+        // Successful request
         const endTime = process.hrtime.bigint();
         const duration = Number(endTime - startTime) / 1_000_000; // Convert to milliseconds
 
-        const { method, route } = request;
-        const { statusCode } = response;
-
-        // Normalize route path to avoid high cardinality
-        const normalizedRoute = this.normalizeRoute(
-          route?.path || request.url || 'unknown',
-        );
-
-        this.metricsService.recordHttpRequest(
-          method || 'unknown',
-          normalizedRoute,
-          statusCode || 500,
+        const httpData: HttpMetricsData = {
+          method: request.method || 'unknown',
+          route: this.getRoutePath(request),
+          statusCode: response.statusCode || 200,
           duration,
-        );
+          timestamp: new Date(),
+          userAgent,
+          ip,
+          userId,
+          correlationId,
+        };
+
+        this.metricsService.recordHttpRequest(httpData);
+        this.metricsService.decrementActiveConnections();
       }),
       catchError((error: unknown) => {
-        // Record error metrics
+        // Error request
         const endTime = process.hrtime.bigint();
         const duration = Number(endTime - startTime) / 1_000_000;
-
-        const { method, route } = request;
         const statusCode = response.statusCode || 500;
-        const normalizedRoute = this.normalizeRoute(
-          route?.path || request.url || 'unknown',
-        );
 
-        this.metricsService.recordHttpRequest(
-          method || 'unknown',
-          normalizedRoute,
+        // Record the request metrics
+        const httpData: HttpMetricsData = {
+          method: request.method || 'unknown',
+          route: this.getRoutePath(request),
           statusCode,
           duration,
-        );
+          timestamp: new Date(),
+          userAgent,
+          ip,
+          userId,
+          correlationId,
+        };
+
+        this.metricsService.recordHttpRequest(httpData);
 
         // Record error-specific metrics
-        const errorName = error instanceof Error ? error.name : 'UnknownError';
-        this.metricsService.recordHttpError(
-          method || 'unknown',
-          normalizedRoute,
+        const errorData: ErrorMetricsData = {
+          method: request.method || 'unknown',
+          route: this.getRoutePath(request),
           statusCode,
-          errorName,
-        );
+          errorType: error instanceof Error ? error.name : 'UnknownError',
+          errorMessage:
+            error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date(),
+          userId,
+          correlationId,
+        };
+
+        this.metricsService.recordHttpError(errorData);
+        this.metricsService.decrementActiveConnections();
 
         return throwError(() => error);
       }),
@@ -77,25 +122,40 @@ export class MetricsInterceptor implements NestInterceptor {
   }
 
   /**
-   * Normalize route paths to prevent high cardinality metrics
-   * Replace dynamic segments with placeholders
+   * Check if route should be excluded from metrics
    */
-  private normalizeRoute(path: string): string {
-    if (!path) return 'unknown';
+  private isExcludedRoute(url: string): boolean {
+    const defaultExcluded = ['/metrics', '/health'];
+    const configExcluded = this.config?.excludedRoutes || [];
+    const allExcluded = [...defaultExcluded, ...configExcluded];
 
+    return allExcluded.some((excluded) => url.includes(excluded));
+  }
+
+  /**
+   * Get route path from request
+   */
+  private getRoutePath(request: any): string {
+    return request.route?.path || request.url || 'unknown';
+  }
+
+  /**
+   * Get client IP address
+   */
+  private getClientIp(request: any): string {
     return (
-      path
-        // Replace UUIDs with placeholder
-        .replace(
-          /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
-          '/:id',
-        )
-        // Replace numeric IDs with placeholder
-        .replace(/\/\d+/g, '/:id')
-        // Replace query parameters
-        .replace(/\?.*$/, '')
-        // Limit length to prevent memory issues
-        .substring(0, 100)
+      request.ip ||
+      request.connection?.remoteAddress ||
+      request.socket?.remoteAddress ||
+      request.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+      'unknown'
     );
+  }
+
+  /**
+   * Generate correlation ID
+   */
+  private generateCorrelationId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 }

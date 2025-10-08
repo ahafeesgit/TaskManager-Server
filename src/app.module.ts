@@ -8,7 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PrismaService } from './prisma/prisma.service';
 import { PrismaModule } from './prisma/prisma.module';
-import { HealthModule } from './health/health.module';
+import { HealthModule } from './common/health';
 import { LoggingModule, LoggingInterceptor } from './common/logging';
 import { GlobalExceptionFilter } from './common/filters';
 import { MetricsModule, MetricsInterceptor } from './common/metrics';
@@ -23,9 +23,9 @@ import { ResponseInterceptor } from './common/interceptors';
         limit: parseInt(process.env.THROTTLE_LIMIT || '10'),
       },
     ]),
-    LoggingModule,
-    MetricsModule,
-    HealthModule,
+    LoggingModule.forRootSimple(),
+    MetricsModule.forRootSimple(),
+    HealthModule.forRootSimple(),
     AuthModule,
     UsersModule,
     PrismaModule,

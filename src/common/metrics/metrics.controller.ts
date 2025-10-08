@@ -32,10 +32,14 @@ export class MetricsController {
   @ApiResponse({ status: 200, description: 'Metrics summary in JSON format' })
   @ApiExcludeEndpoint(process.env.NODE_ENV === 'production')
   getSummary() {
+    // Get summary from service (which already includes timestamp and environment)
+    const summary = this.metricsService.getMetricsSummary();
+
     return {
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
-      ...this.metricsService.getMetricsSummary(),
+      ...summary,
+      // Add additional controller-level information
+      nodeVersion: process.version,
+      platform: process.platform,
     };
   }
 }

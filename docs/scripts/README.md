@@ -29,7 +29,7 @@ Before running these scripts, ensure you have:
 - **npm** or **yarn**
 - **PostgreSQL** (for database operations)
 - **Git** (for version control)
-- **Docker** (optional, for containerized deployments)
+- **Container runtime** (optional, for containerized deployments)
 - **PM2** (optional, for production deployment)
 
 ### macOS/Linux Requirements

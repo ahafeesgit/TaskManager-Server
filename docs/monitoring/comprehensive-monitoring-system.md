@@ -436,26 +436,14 @@ scrape_configs:
     scrape_interval: 30s
 ```
 
-### Docker Health Checks
+### Container Health Checks
 
-#### Dockerfile Configuration
-
-```dockerfile
-FROM node:18-alpine
-
-# Application setup...
-
-# Health check using the liveness endpoint
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node src/health-check.js || exit 1
-
-# Alternative using curl
-# HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-#   CMD curl -f http://localhost:3000/health/live || exit 1
+The application provides standard health check endpoints for container orchestration:
 
 EXPOSE 3000
 CMD ["npm", "run", "start:prod"]
-```
+
+````
 
 ## 🚨 Alerting & Notifications
 
@@ -513,7 +501,7 @@ groups:
           severity: critical
         annotations:
           summary: 'Database health check failing'
-```
+````
 
 #### Resource Alerts
 
@@ -611,7 +599,7 @@ groups:
 curl -X GET http://localhost:3000/health/ready
 
 # Verify database status
-docker exec -it postgres-container pg_isready
+pg_isready -h localhost -p 5432
 
 # Check connection pool
 curl -X GET http://localhost:3000/metrics | grep database_connections
@@ -637,10 +625,10 @@ node --inspect index.js
 df -h
 
 # Find large files
-du -sh /var/lib/docker/* | sort -rh | head -10
+find / -size +1G -type f 2>/dev/null | head -10
 
-# Clean up Docker resources
-docker system prune -f
+# Clean up system resources
+npm cache clean --force
 ```
 
 #### 2. Metrics Collection Issues

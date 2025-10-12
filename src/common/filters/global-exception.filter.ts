@@ -7,7 +7,14 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { ApiResponse } from '../interfaces/api-response.interface';
+
+// Simple API response interface for error handling
+interface ApiResponse<T = any> {
+  success: boolean;
+  code: number;
+  data: T | null;
+  messages: string[];
+}
 
 // Define interface for HTTP exception response
 interface HttpExceptionResponse {

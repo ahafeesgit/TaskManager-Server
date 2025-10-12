@@ -174,25 +174,30 @@ export class AppModule {}
 ## 🚨 Common Integration Issues & Solutions
 
 ### Issue: "Nest can't resolve dependencies of LoggingInterceptor"
+
 **Cause**: `LoggingModule` imported without `.forRootSimple()`  
 **Solution**:
+
 ```typescript
 // ❌ Wrong
-imports: [LoggingModule]
+imports: [LoggingModule];
 
-// ✅ Correct  
-imports: [LoggingModule.forRootSimple()]
+// ✅ Correct
+imports: [LoggingModule.forRootSimple()];
 ```
 
-### Issue: "Nest can't resolve dependencies of LogSanitizerService" 
+### Issue: "Nest can't resolve dependencies of LogSanitizerService"
+
 **Cause**: Missing `LOGGING_CONFIG` provider in simple setup  
 **Solution**: Use `.forRootSimple()` which handles this automatically
 
 ### Issue: HTTP requests not being logged
+
 **Cause**: Missing interceptor registration  
 **Solution**: Add `LoggingInterceptor` as `APP_INTERCEPTOR` provider
 
 ### Issue: Application won't start after adding logging
+
 **Cause**: Incorrect module registration  
 **Solution**: Follow the complete integration example above
 

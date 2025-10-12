@@ -1,6 +1,34 @@
 # NestJS Interceptors Module
 
-A comprehensive, production-ready interceptor system for NestJS applications that handles cross-cutting concerns including response transformation, logging, timeouts, data transformation, and error handling.
+# NestJS Interceptors Module
+
+A comprehensive, production-ready interceptors module for NestJS applications that provides standardized HTTP request/response handling, logging, error management, and data transformation.
+
+## ✅ Fully Modular & Reusable
+
+This module is **completely self-contained** and can be copied to any NestJS project. It includes:
+
+- **All required types and interfaces** in `./types/` and `./interfaces/`
+- **API response standards documentation** in `./API-RESPONSE-STANDARDS.md`
+- **Complete configuration system** with `.forRootSimple()`
+- **Zero external dependencies** (except NestJS core)
+
+### 📁 Module Structure
+
+```
+interceptors/
+├── types/                     # ✅ Internal API response types
+│   └── api-response.types.ts
+├── interfaces/               # ✅ Internal configuration interfaces
+│   └── interceptor.interface.ts
+├── README.md                 # ✅ Complete documentation
+├── API-RESPONSE-STANDARDS.md # ✅ Response format guide
+├── interceptors.module.ts    # ✅ Main module file
+├── index.ts                  # ✅ Public exports
+└── ... (all interceptors)    # ✅ Implementation files
+```
+
+**Copy this entire folder to any project and it works immediately!**
 
 ## Overview
 

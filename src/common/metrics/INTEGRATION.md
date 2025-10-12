@@ -138,25 +138,30 @@ export class AppModule {}
 ## 🚨 Common Integration Issues & Solutions
 
 ### Issue: "Nest can't resolve dependencies of MetricsInterceptor"
+
 **Cause**: `MetricsModule` imported without `.forRootSimple()`  
 **Solution**:
+
 ```typescript
 // ❌ Wrong
-imports: [MetricsModule]
+imports: [MetricsModule];
 
-// ✅ Correct  
-imports: [MetricsModule.forRootSimple()]
+// ✅ Correct
+imports: [MetricsModule.forRootSimple()];
 ```
 
 ### Issue: "Nest can't resolve dependencies of MetricsService"
+
 **Cause**: Missing Prometheus metric providers  
 **Solution**: Use `.forRootSimple()` which registers all providers correctly
 
 ### Issue: HTTP metrics not being collected
+
 **Cause**: Missing interceptor registration  
 **Solution**: Add `MetricsInterceptor` as `APP_INTERCEPTOR` provider
 
 ### Issue: "Cannot find module '@willsoto/nestjs-prometheus'"
+
 **Cause**: Missing required dependencies  
 **Solution**: `npm install @willsoto/nestjs-prometheus prom-client`
 

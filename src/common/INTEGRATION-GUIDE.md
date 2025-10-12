@@ -5,11 +5,12 @@ This guide shows how to integrate multiple modules (Health, Logging, Metrics, In
 ## Prerequisites
 
 Install required dependencies:
+
 ```bash
 # Core NestJS dependencies (usually already installed)
 npm install @nestjs/common @nestjs/core rxjs
 
-# Metrics dependencies  
+# Metrics dependencies
 npm install @willsoto/nestjs-prometheus prom-client
 
 # Logging dependencies (built-in)
@@ -42,13 +43,13 @@ import { YourFeatureModule } from './your-feature/your-feature.module';
   imports: [
     // Configuration (always first)
     ConfigModule.forRoot({ isGlobal: true }),
-    
+
     // Common modules - CRITICAL: Must use .forRootSimple()
     HealthModule.forRootSimple(),
     LoggingModule.forRootSimple(),
     MetricsModule.forRootSimple(),
     InterceptorsModule, // This module handles its own registration
-    
+
     // Your feature modules
     YourFeatureModule,
   ],
@@ -59,7 +60,7 @@ import { YourFeatureModule } from './your-feature/your-feature.module';
       useClass: LoggingInterceptor, // Logging first
     },
     {
-      provide: APP_INTERCEPTOR, 
+      provide: APP_INTERCEPTOR,
       useClass: MetricsInterceptor, // Metrics second
     },
     // Note: InterceptorsModule handles its own interceptor registration
@@ -76,13 +77,14 @@ export class AppModule {}
 // Simple setup - no additional configuration needed
 imports: [
   HealthModule.forRootSimple(), // Provides /health, /health/ready, /health/live endpoints
-]
+];
 ```
 
 **Endpoints available:**
+
 - `GET /health` - Comprehensive health check
 - `GET /health/ready` - Readiness probe
-- `GET /health/live` - Liveness probe  
+- `GET /health/live` - Liveness probe
 - `GET /health/info` - Application info
 
 ### 2. Logging Module
@@ -91,7 +93,7 @@ imports: [
 // Module import
 imports: [
   LoggingModule.forRootSimple(), // Provides WinstonLoggerService
-]
+];
 
 // Interceptor registration (for HTTP request logging)
 providers: [
@@ -99,10 +101,11 @@ providers: [
     provide: APP_INTERCEPTOR,
     useClass: LoggingInterceptor,
   },
-]
+];
 ```
 
 **Features enabled:**
+
 - Structured logging with Winston
 - Automatic log sanitization
 - HTTP request/response logging
@@ -111,10 +114,10 @@ providers: [
 ### 3. Metrics Module
 
 ```typescript
-// Module import  
+// Module import
 imports: [
   MetricsModule.forRootSimple(), // Provides MetricsService + Prometheus
-]
+];
 
 // Interceptor registration (for HTTP metrics)
 providers: [
@@ -122,10 +125,11 @@ providers: [
     provide: APP_INTERCEPTOR,
     useClass: MetricsInterceptor,
   },
-]
+];
 ```
 
 **Endpoints available:**
+
 - `GET /metrics` - Prometheus metrics
 - `GET /metrics/summary` - Metrics summary
 
@@ -135,10 +139,11 @@ providers: [
 // Module import (handles its own interceptor registration)
 imports: [
   InterceptorsModule, // Provides response formatting, timeouts, etc.
-]
+];
 ```
 
 **Features enabled:**
+
 - Standardized API responses
 - Request timeouts
 - Data transformation
@@ -154,7 +159,7 @@ HEALTH_DATABASE_ENABLED=true
 HEALTH_MEMORY_ENABLED=true
 HEALTH_DISK_ENABLED=true
 
-# Logging Module  
+# Logging Module
 LOG_LEVEL=info
 LOG_FILE_ENABLED=true
 LOG_DIRECTORY=logs
@@ -177,16 +182,19 @@ DEFAULT_TIMEOUT_MS=30000
 After integration, verify everything works:
 
 ### 1. Build the application
+
 ```bash
 npm run build
 ```
 
-### 2. Start the application  
+### 2. Start the application
+
 ```bash
 npm run start:dev
 ```
 
 ### 3. Test key endpoints
+
 ```bash
 # Health check
 curl http://localhost:3000/health
@@ -208,14 +216,14 @@ curl http://localhost:3000/your-endpoint
 
 ```typescript
 // Wrong ❌
-imports: [HealthModule, LoggingModule, MetricsModule]
+imports: [HealthModule, LoggingModule, MetricsModule];
 
-// Correct ✅  
+// Correct ✅
 imports: [
   HealthModule.forRootSimple(),
-  LoggingModule.forRootSimple(), 
+  LoggingModule.forRootSimple(),
   MetricsModule.forRootSimple(),
-]
+];
 ```
 
 ### ❌ Missing Features
@@ -234,7 +242,7 @@ providers: [
     provide: APP_INTERCEPTOR,
     useClass: MetricsInterceptor, // For HTTP metrics
   },
-]
+];
 ```
 
 ### ❌ Dependency Issues
@@ -252,36 +260,31 @@ npm install @willsoto/nestjs-prometheus prom-client
 You can use any combination of modules:
 
 ### Minimal Setup (Health + Logging)
+
 ```typescript
-imports: [
-  HealthModule.forRootSimple(),
-  LoggingModule.forRootSimple(),
-]
+imports: [HealthModule.forRootSimple(), LoggingModule.forRootSimple()];
 ```
 
-### Monitoring Setup (Health + Metrics)  
+### Monitoring Setup (Health + Metrics)
+
 ```typescript
-imports: [
-  HealthModule.forRootSimple(),
-  MetricsModule.forRootSimple(), 
-]
-providers: [
-  { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
-]
+imports: [HealthModule.forRootSimple(), MetricsModule.forRootSimple()];
+providers: [{ provide: APP_INTERCEPTOR, useClass: MetricsInterceptor }];
 ```
 
 ### Complete Setup (All Modules)
+
 ```typescript
 imports: [
   HealthModule.forRootSimple(),
   LoggingModule.forRootSimple(),
   MetricsModule.forRootSimple(),
   InterceptorsModule,
-]
+];
 providers: [
   { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
   { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
-]
+];
 ```
 
 ## Next Steps

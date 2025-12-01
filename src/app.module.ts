@@ -10,9 +10,9 @@ import { PrismaService } from './prisma/prisma.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './common/health';
 import { LoggingModule, LoggingInterceptor } from './common/logging';
-import { GlobalExceptionFilter } from './common/filters';
+import { FiltersModule } from './common/filters';
 import { MetricsModule, MetricsInterceptor } from './common/metrics';
-import { ResponseInterceptor } from './common/interceptors';
+import { InterceptorsModule } from './common/interceptors';
 
 @Module({
   imports: [
@@ -23,9 +23,14 @@ import { ResponseInterceptor } from './common/interceptors';
         limit: parseInt(process.env.THROTTLE_LIMIT || '10'),
       },
     ]),
+    // Modular common modules - each handles its own registration
+    HealthModule.forRootSimple(),
     LoggingModule.forRootSimple(),
     MetricsModule.forRootSimple(),
-    HealthModule.forRootSimple(),
+    InterceptorsModule.forRootSimple(),
+    FiltersModule.forRootSimple(),
+
+    // Feature modules
     AuthModule,
     UsersModule,
     PrismaModule,
@@ -34,14 +39,8 @@ import { ResponseInterceptor } from './common/interceptors';
   providers: [
     AppService,
     PrismaService,
-    {
-      provide: APP_FILTER,
-      useClass: GlobalExceptionFilter,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: ResponseInterceptor,
-    },
+    // Note: Individual interceptors for logging and metrics
+    // The modules handle their own filter/interceptor registration
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

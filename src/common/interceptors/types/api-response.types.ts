@@ -1,6 +1,6 @@
 /**
  * Simple API Response Types
- * 
+ *
  * Standardizes all API responses to have consistent format:
  * { success: boolean, code: number, data: any, messages: string[] }
  */
@@ -17,7 +17,7 @@ export interface ListData<T> {
   items: T[];
 }
 
-// For paginated list responses  
+// For paginated list responses
 export interface PaginatedData<T> {
   items: T[];
   pagination: {

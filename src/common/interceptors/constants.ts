@@ -12,5 +12,3 @@ export const DEFAULT_INTERCEPTOR_CONFIG = {
     excludeRoutes: ['/health', '/metrics', '/docs'],
   },
 };
-
-
